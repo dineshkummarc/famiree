@@ -1,0 +1,80 @@
+<?php
+/**
+ * MiniAsset
+ * Copyright (c) Mark Story (http://mark-story.com)
+ *
+ * Licensed under The MIT License
+ * For full copyright and license information, please see the LICENSE.txt
+ * Redistributions of files must retain the above copyright notice.
+ *
+ * @copyright Copyright (c) Mark Story (http://mark-story.com)
+ * @since     0.0.1
+ * @license   http://www.opensource.org/licenses/mit-license.php MIT License
+ */
+namespace MiniAsset\Filter;
+
+use MiniAsset\Filter\AssetFilter;
+use MiniAsset\Filter\CssDependencyTrait;
+
+/**
+ * Pre-processing filter that adds support for SCSS files.
+ *
+ * Requires ruby and sass rubygem to be installed
+ *
+ * @see http://sass-lang.com/
+ */
+class ScssFilter extends AssetFilter
+{
+    use CssDependencyTrait {
+        getDependencies as getCssDependencies;
+    }
+
+    protected $_settings = array(
+        'ext' => ['.scss', '.sass'],
+        'sass' => '/usr/bin/sass',
+        'path' => '/usr/bin',
+        'imports' => [],
+    );
+
+    /**
+     * SCSS will use `_` prefixed files if they exist.
+     *
+     * @var string
+     */
+    protected $optionalDependencyPrefix = '_';
+
+    public function getDependencies($target)
+    {
+        return $this->getCssDependencies($target, $this->_settings['imports']);
+    }
+
+    /**
+     * Runs SCSS compiler against any files that match the configured extension.
+     *
+     * @param  string $filename The name of the input file.
+     * @param  string $content    The content of the file.
+     * @return string
+     */
+    public function input($filename, $content)
+    {
+        $ext = '.' . pathinfo($filename, PATHINFO_EXTENSION);
+
+        $acceptedExt = $this->_settings['ext'];
+        if (is_string($acceptedExt)) {
+            $acceptedExt = [$acceptedExt];
+        }
+
+        if (!in_array($ext, $acceptedExt)) {
+            return $content;
+        }
+
+        $filename = preg_replace('/ /', '\\ ', $filename);
+        $cmd = $this->_settings['sass'];
+        foreach ($this->_settings['imports'] as $path) {
+            $cmd .= ' -I ' . escapeshellarg($path);
+        }
+        $bin = $cmd . ' ' . $filename;
+        $return = $this->_runCmd($bin, '', array('PATH' => $this->_settings['path']));
+        return $return;
+    }
+}
